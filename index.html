@@ -1,0 +1,1194 @@
+<!DOCTYPE html>
+<html lang="ja">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Web Media Player with Annotations</title>
+    <style>
+        :root {
+            --bg-body: #f0f0f0;
+            --bg-container: #fff;
+            --bg-panel: #fff;
+            --bg-controls: #eee;
+            --bg-sidebar: #f0f0f0;
+            --bg-item-active: #eef;
+            --bg-item-hover: #f9f9f9;
+            --text-main: #333;
+            --text-muted: #666;
+            --border-color: #ccc;
+            --accent-color: #007acc;
+            --accent-hover: #005a9e;
+        }
+
+        [data-theme="dark"] {
+            --bg-body: #1a1a1a;
+            --bg-container: #2d2d2d;
+            --bg-panel: #2d2d2d;
+            --bg-controls: #333;
+            --bg-sidebar: #252525;
+            --bg-item-active: #3a3a4a;
+            --bg-item-hover: #353535;
+            --text-main: #e0e0e0;
+            --text-muted: #aaa;
+            --border-color: #444;
+            --accent-color: #0098ff;
+            --accent-hover: #007acc;
+        }
+
+        body {
+            font-family: Arial;
+            margin: 0;
+            padding: 0;
+            background: var(--bg-body);
+            color: var(--text-main);
+            transition: background 0.3s, color 0.3s;
+        }
+
+        #container {
+            display: flex;
+            height: 100vh;
+        }
+
+        #video-section {
+            flex: 3;
+            display: flex;
+            flex-direction: column;
+            background: #000;
+            overflow-y: auto;
+            position: relative;
+        }
+
+        #annotations {
+            flex: 1;
+            background: var(--bg-panel);
+            padding: 10px;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            border-left: 1px solid var(--border-color);
+        }
+
+        #annotation-controls {
+            flex-shrink: 0;
+            margin-bottom: 10px;
+        }
+
+        #annotation-list {
+            flex: 1;
+            overflow-y: auto;
+        }
+
+        #annotation-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        #annotation-table td,
+        #annotation-table th {
+            border: 1px solid var(--border-color);
+            padding: 8px;
+            text-align: center;
+        }
+
+        #annotation-table th {
+            background-color: var(--bg-controls);
+            position: relative;
+            color: var(--text-main);
+        }
+
+        #th-index,
+        #th-play,
+        #th-time,
+        #th-move,
+        #th-delete {
+            width: 1%;
+            white-space: nowrap;
+        }
+
+        #th-note {
+            width: auto;
+        }
+
+        .col-resizer {
+            position: absolute;
+            right: 0;
+            top: 0;
+            bottom: 0;
+            width: 5px;
+            cursor: col-resize;
+            user-select: none;
+            touch-action: none;
+        }
+
+        .col-resizer:hover {
+            background-color: var(--border-color);
+        }
+
+        .annotation-row:hover {
+            background-color: var(--bg-item-hover);
+            cursor: pointer;
+        }
+
+        #file-input-container {
+            padding: 5px 10px;
+            background: var(--bg-controls);
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 15px;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .input-group {
+            display: flex;
+            align-items: center;
+        }
+
+        .file-label {
+            font-weight: bold;
+            margin-right: 5px;
+            white-space: nowrap;
+            color: var(--text-main);
+        }
+
+        input[type="file"] {
+            border: 1px solid var(--border-color);
+            padding: 2px;
+            border-radius: 4px;
+            background: var(--bg-container);
+            color: var(--text-main);
+            max-width: 200px;
+        }
+
+        button {
+            margin: 4px;
+            padding: 6px 14px;
+            background-color: var(--accent-color);
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: background 0.2s;
+        }
+
+        button:hover {
+            background-color: var(--accent-hover);
+        }
+
+        .playlist-item:hover {
+            background-color: var(--bg-item-hover) !important;
+        }
+
+        .playlist-item.active {
+            background-color: var(--bg-item-active) !important;
+        }
+
+        .btn-remove-playlist {
+            background-color: var(--border-color);
+            padding: 2px 6px;
+            margin-left: 10px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            color: var(--text-main);
+            font-weight: bold;
+            transition: background-color 0.2s, color 0.2s;
+        }
+
+        .btn-remove-playlist:hover {
+            background-color: #ff4d4d;
+            color: white;
+        }
+
+        .badge {
+            background: var(--accent-color);
+            color: white;
+            border-radius: 12px;
+            padding: 2px 8px;
+            font-size: 11px;
+            font-weight: bold;
+            margin-left: 5px;
+        }
+
+        input[type="range"] {
+            cursor: pointer;
+        }
+
+        .btn-move {
+            padding: 2px 6px;
+            font-size: 12px;
+            margin: 0 2px;
+        }
+
+        #resizer {
+            width: 8px;
+            background: var(--bg-body);
+            cursor: col-resize;
+            flex-shrink: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-left: 1px solid var(--border-color);
+            border-right: 1px solid var(--border-color);
+        }
+
+        #resizer:hover {
+            background: var(--border-color);
+        }
+
+        #resizer::after {
+            content: "||";
+            color: var(--text-muted);
+            font-size: 10px;
+        }
+
+        #video-placeholder {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            background: linear-gradient(135deg, #1a1a1a 0%, #333 100%);
+            color: #fff;
+            z-index: 5;
+            text-align: center;
+        }
+
+        #video-placeholder svg {
+            width: 80px;
+            height: 80px;
+            margin-bottom: 20px;
+            opacity: 0.7;
+        }
+
+        #playback-speed-controls {
+            padding: 10px;
+            background: var(--bg-sidebar);
+            color: var(--text-main);
+            border-top: 1px solid var(--border-color);
+            display: flex;
+            align-items: center;
+        }
+
+        #playlist-section {
+            padding: 10px;
+            background: var(--bg-sidebar);
+            color: var(--text-main);
+            border-top: 1px solid var(--border-color);
+        }
+    </style>
+</head>
+
+<body>
+    <div id="container">
+        <div id="video-section">
+            <div id="file-input-container">
+                <div class="input-group">
+                    <label class="file-label" id="label-video">Video:</label>
+                    <input type="file" id="video-file" accept="video/*,.mp4,.mkv,.avi">
+                </div>
+                <div class="input-group">
+                    <label class="file-label" id="label-annotation">Annotation:</label>
+                    <input type="file" id="annotation-file" accept=".txt">
+                </div>
+            </div>
+            <div id="video-placeholder">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                    stroke-linejoin="round">
+                    <rect x="2" y="2" width="20" height="20" rx="2.18" ry="2.18"></rect>
+                    <line x1="7" y1="2" x2="7" y2="22"></line>
+                    <line x1="17" y1="2" x2="17" y2="22"></line>
+                    <line x1="2" y1="12" x2="22" y2="12"></line>
+                    <line x1="2" y1="7" x2="7" y2="7"></line>
+                    <line x1="2" y1="17" x2="7" y2="17"></line>
+                    <line x1="17" y1="17" x2="22" y2="17"></line>
+                    <line x1="17" y1="7" x2="22" y2="7"></line>
+                </svg>
+                <h2 id="placeholder-text">Drop video here or load via button</h2>
+                <button id="btn-placeholder-load" style="margin-top: 10px; padding: 10px 20px; font-size: 16px;">Load
+                    Video</button>
+            </div>
+            <video id="video" width="100%" height="auto" controls style="display: none;"></video>
+            <div id="audio-track-controls"
+                style="padding: 10px; background: var(--bg-sidebar); color: var(--text-main);"></div>
+            <div id="playback-speed-controls">
+                <label id="label-speed" style="margin-right: 10px; font-weight: bold;">Playback Speed:</label>
+                <input type="range" id="speed-range" min="0.1" max="10.0" step="0.1" value="1.0"
+                    style="flex: 1; max-width: 300px;">
+                <span id="speed-value" style="margin: 0 10px; min-width: 40px;">1.0x</span>
+                <button id="btn-speed-reset" style="padding: 2px 8px; font-size: 12px;">Reset</button>
+            </div>
+            <!-- Playlist Section -->
+            <div id="playlist-section">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px;">
+                    <h4 id="label-playlist" style="margin: 0;">Editing Material</h4>
+                </div>
+                <div id="playlist-controls" style="margin-bottom: 5px; display: flex; gap: 5px;">
+                    <button id="btn-save-all" onclick="saveAllAnnotations()"
+                        style="font-size: 12px; padding: 2px 6px;">Save All</button>
+                    <button id="btn-copy-all" onclick="copyAllAnnotations()"
+                        style="font-size: 12px; padding: 2px 6px;">Copy All</button>
+                    <button id="btn-clear-playlist" onclick="clearPlaylist()"
+                        style="font-size: 12px; padding: 2px 6px; margin-left: auto;">Clear Playlist</button>
+                </div>
+                <ul id="playlist-ul" style="list-style: none; padding: 0; margin: 0;"></ul>
+            </div>
+        </div>
+        <div id="resizer"></div>
+        <div id="annotations">
+            <div id="annotation-controls">
+                <div
+                    style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 5px;">
+                    <h3 id="annotation-title" style="margin: 0;">Annotations</h3>
+                    <button id="btn-theme-toggle" onclick="toggleTheme()"
+                        style="background: none; border: 1px solid var(--border-color); color: var(--text-main); font-size: 14px; padding: 2px 8px; margin: 0;">🌙</button>
+                </div>
+                <button onclick="addAnnotation()" id="btn-add">Add</button>
+                <button onclick="saveAnnotations()" id="btn-save">Save txt</button>
+                <button onclick="copyAnnotations()" id="btn-copy">Copy</button>
+                <button onclick="sortAnnotations()" id="btn-sort">Sort</button>
+                <button onclick="clearAnnotations()" id="btn-clear">Clear All</button>
+            </div>
+            <div id="annotation-list">
+                <table id="annotation-table">
+                    <thead>
+                        <tr>
+                            <th id="th-index">#</th>
+                            <th id="th-play">Play</th>
+                            <th id="th-time">Timestamp</th>
+                            <th id="th-note">Note</th>
+                            <th id="th-move">Move</th>
+                            <th id="th-delete">Delete</th>
+                        </tr>
+                    </thead>
+                    <tbody id="annotation-body"></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Help Modal -->
+    <script>
+        const lang = navigator.language.startsWith("ja") ? "ja" : "en";
+
+        const text = {
+            ja: {
+                video: "動画読み込み：",
+                annotation: "アノテーション読み込み：",
+                title: "アノテーション一覧",
+                add: "項目を追加",
+                save: "txtに保存",
+                copy: "テキストでコピー",
+                sort: "タイムスタンプで並べ替え",
+                clear: "全消去",
+                play: "再生",
+                timestamp: "タイムスタンプ",
+                note: "アノテーション",
+                delete: "削除",
+                index: "#",
+                move: "移動",
+                speed: "再生速度: ",
+                reset: "リセット",
+                playlistLabel: "素材",
+                clearPlaylist: "プレイリストをクリア",
+                saveAll: "全テキスト保存",
+                copyAll: "全コピー",
+                placeholder: "動画をここにドロップ、または読み込んでください",
+                loadBtn: "動画を読み込む"
+            },
+            en: {
+                video: "Load Video:",
+                annotation: "Load Annotations:",
+                title: "Annotations",
+                add: "Add",
+                save: "Save txt",
+                copy: "Copy",
+                sort: "Sort by Timestamp",
+                clear: "Clear All",
+                play: "Play",
+                timestamp: "Timestamp",
+                note: "Note",
+                delete: "Delete",
+                index: "#",
+                move: "Move",
+                speed: "Playback Speed: ",
+                reset: "Reset",
+                playlistLabel: "Material",
+                clearPlaylist: "Clear Playlist",
+                saveAll: "Save All",
+                copyAll: "Copy All",
+                placeholder: "Drop video here or load via button",
+                loadBtn: "Load Video"
+            }
+        };
+
+        const t = text[lang];
+        document.getElementById("label-video").textContent = t.video;
+        document.getElementById("label-annotation").textContent = t.annotation;
+        document.getElementById("annotation-title").textContent = t.title;
+        document.getElementById("btn-add").textContent = t.add;
+        document.getElementById("btn-save").textContent = t.save;
+        document.getElementById("btn-copy").textContent = t.copy;
+        document.getElementById("btn-sort").textContent = t.sort;
+        document.getElementById("btn-clear").textContent = t.clear;
+        document.getElementById("th-play").textContent = t.play;
+        document.getElementById("th-time").textContent = t.timestamp;
+        document.getElementById("th-note").textContent = t.note;
+        document.getElementById("th-delete").textContent = t.delete;
+        document.getElementById("th-index").textContent = t.index;
+        document.getElementById("th-move").textContent = t.move;
+
+        document.getElementById("label-speed").textContent = t.speed;
+        document.getElementById("btn-speed-reset").textContent = t.reset;
+
+        // Playlist
+        document.getElementById("label-playlist").textContent = t.playlistLabel;
+        document.getElementById("btn-clear-playlist").textContent = t.clearPlaylist;
+        document.getElementById("btn-save-all").textContent = t.saveAll;
+        document.getElementById("btn-copy-all").textContent = t.copyAll;
+        document.getElementById("placeholder-text").textContent = t.placeholder;
+        const btnPlaceholderLoad = document.getElementById("btn-placeholder-load");
+        btnPlaceholderLoad.textContent = t.loadBtn;
+
+        const video = document.getElementById("video");
+        const placeholder = document.getElementById("video-placeholder");
+        const videoFileInput = document.getElementById("video-file");
+        const annotationFileInput = document.getElementById("annotation-file");
+        const annotationBody = document.getElementById("annotation-body");
+        const trackContainer = document.getElementById("audio-track-controls");
+
+        btnPlaceholderLoad.onclick = () => videoFileInput.click();
+
+        // Speed Control
+        const speedRange = document.getElementById("speed-range");
+        const speedValue = document.getElementById("speed-value");
+        const btnSpeedReset = document.getElementById("btn-speed-reset");
+
+        speedRange.addEventListener("input", (e) => {
+            const val = parseFloat(e.target.value);
+            video.playbackRate = val;
+            speedValue.textContent = val.toFixed(1) + "x";
+            localStorage.setItem("playbackSpeed", val);
+        });
+
+        btnSpeedReset.addEventListener("click", () => {
+            const val = 1.0;
+            video.playbackRate = val;
+            speedRange.value = val;
+            speedValue.textContent = val.toFixed(1) + "x";
+            localStorage.setItem("playbackSpeed", val);
+        });
+
+        // Sync speed when new video loads
+        video.addEventListener('loadedmetadata', () => {
+            if (speedRange) {
+                video.playbackRate = parseFloat(speedRange.value);
+            }
+        });
+
+        const titleElement = document.getElementById("annotation-title");
+
+        let annotations = [];
+        let prevTrackCount = -1;
+        let currentVideoName = "";
+
+        let playlist = []; // { name, videoFile, annotations, duration, isPlaying }
+        let currentPlaylistIndex = -1;
+
+        function saveCurrentStateToPlaylist() {
+            if (currentPlaylistIndex >= 0 && currentPlaylistIndex < playlist.length) {
+                playlist[currentPlaylistIndex].annotations = [...annotations];
+            }
+        }
+
+        // Pending Annotations Queue: { "VideoName": [annotations...], ... }
+        let pendingAnnotations = {};
+
+        function renderPlaylist() {
+            const ul = document.getElementById("playlist-ul");
+            ul.innerHTML = "";
+            playlist.forEach((item, index) => {
+                const li = document.createElement("li");
+                li.className = "playlist-item" + (index === currentPlaylistIndex ? " active" : "");
+                li.style.padding = "10px";
+                li.style.borderBottom = "1px solid #ccc";
+                li.style.cursor = "pointer";
+                li.style.display = "flex";
+                li.style.alignItems = "flex-start";
+                li.onclick = () => switchVideo(index);
+
+                // Thumbnail
+                const img = document.createElement("img");
+                img.style.width = "80px";
+                img.style.height = "60px";
+                img.style.objectFit = "cover";
+                img.style.marginRight = "10px";
+                img.style.background = "#ddd";
+                if (item.thumbnail) {
+                    img.src = item.thumbnail;
+                } else {
+                    // Loading or Pending placeholder
+                    img.style.background = "#eee";
+                }
+
+                // Info Container
+                const infoDiv = document.createElement("div");
+                infoDiv.style.flex = "1";
+                infoDiv.style.display = "flex";
+                infoDiv.style.justifyContent = "space-between";
+                infoDiv.style.alignItems = "center";
+
+                // Name Container
+                const nameContainer = document.createElement("div");
+                nameContainer.style.display = "flex";
+                nameContainer.style.alignItems = "center";
+
+                // Name
+                const nameSpan = document.createElement("span");
+                nameSpan.textContent = item.name;
+                nameSpan.style.fontWeight = "bold";
+                nameSpan.style.wordBreak = "break-all";
+                nameContainer.appendChild(nameSpan);
+
+                // Count Badge
+                if (item.annotations.length > 0) {
+                    const badge = document.createElement("span");
+                    badge.className = "badge";
+                    badge.textContent = item.annotations.length;
+                    nameContainer.appendChild(badge);
+                }
+
+                // Remove Button
+                const removeBtn = document.createElement("button");
+                removeBtn.textContent = "×";
+                removeBtn.className = "btn-remove-playlist";
+                removeBtn.onclick = (e) => {
+                    e.stopPropagation();
+                    removeFromPlaylist(index);
+                };
+
+                infoDiv.appendChild(nameContainer);
+                infoDiv.appendChild(removeBtn);
+
+                li.appendChild(img);
+                li.appendChild(infoDiv);
+                ul.appendChild(li);
+            });
+        }
+
+        async function generateThumbnail(file) {
+            return new Promise((resolve) => {
+                const url = URL.createObjectURL(file);
+                const vid = document.createElement("video");
+                vid.src = url;
+                vid.muted = true;
+                vid.crossOrigin = "anonymous";
+                vid.currentTime = 1;
+
+                vid.onloadeddata = () => {
+                    vid.currentTime = Math.min(5, vid.duration / 2);
+                };
+
+                vid.onseeked = () => {
+                    const canvas = document.createElement("canvas");
+                    canvas.width = 160;
+                    canvas.height = 120;
+                    const ctx = canvas.getContext("2d");
+                    ctx.drawImage(vid, 0, 0, canvas.width, canvas.height);
+                    resolve(canvas.toDataURL());
+                };
+
+                vid.onerror = () => resolve(null);
+            });
+        }
+
+        function addVideoToPlaylist(file, autoSwitch = false) {
+            const nameWithoutExt = file.name.replace(/\.[^/.]+$/, "");
+
+            // Check for existing item with this name (Text Only or Video)
+            let index = playlist.findIndex(p => p.name === file.name || p.name === nameWithoutExt);
+
+            let item;
+            if (index !== -1) {
+                // Update existing
+                item = playlist[index];
+                item.videoFile = file;
+                // Use video name as authority IF it was text-only/placeholder
+                item.name = file.name;
+                item.url = URL.createObjectURL(file);
+                item.thumbnail = null;
+            } else {
+                // Create new
+                item = {
+                    name: file.name,
+                    videoFile: file,
+                    annotations: [],
+                    url: URL.createObjectURL(file),
+                    thumbnail: null
+                };
+
+                // Default Annotation Loading: Inherit if first video and global annotations exist
+                if (playlist.length === 0 && annotations.length > 0) {
+                    item.annotations = [...annotations];
+                }
+
+                playlist.push(item);
+                index = playlist.length - 1;
+            }
+
+            // Check Pending Annotations
+            // Try matching nameWithoutExt
+            if (pendingAnnotations[nameWithoutExt]) {
+                item.annotations = pendingAnnotations[nameWithoutExt];
+                delete pendingAnnotations[nameWithoutExt];
+            } else if (pendingAnnotations[file.name]) {
+                item.annotations = pendingAnnotations[file.name];
+                delete pendingAnnotations[file.name];
+            }
+            // Also check for pending annotations stored by Header? (Hard to know header without parsing, but pending stores keys)
+
+            // Generate Thumbnail
+            generateThumbnail(file).then(thumb => {
+                item.thumbnail = thumb;
+                renderPlaylist();
+            });
+
+            if (autoSwitch || (playlist.length === 1 && currentPlaylistIndex === -1)) {
+                switchVideo(index);
+            } else {
+                renderPlaylist();
+            }
+        }
+
+        function saveAllAnnotations() {
+            saveCurrentStateToPlaylist(); // ensure current is up to date
+
+            let content = "";
+            playlist.forEach(item => {
+                if (item.annotations && item.annotations.length > 0) {
+                    content += `--- ${item.name} ---\n`;
+                    content += item.annotations.map(a => `${a.timestamp} ${a.note}`).join("\n");
+                    content += "\n\n";
+                }
+            });
+
+            if (!content) {
+                alert(lang === "ja" ? "アノテーションがありません。" : "No annotations to save.");
+                return;
+            }
+
+            const blob = new Blob([content], { type: "text/plain" });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement("a");
+            a.href = url;
+            a.download = "all_annotations.txt";
+            a.click();
+            URL.revokeObjectURL(url);
+        }
+
+        function copyAllAnnotations() {
+            saveCurrentStateToPlaylist();
+
+            let content = "";
+            playlist.forEach(item => {
+                if (item.annotations && item.annotations.length > 0) {
+                    content += `--- ${item.name} ---\n`;
+                    content += item.annotations.map(a => `${a.timestamp} ${a.note}`).join("\n");
+                    content += "\n\n";
+                }
+            });
+
+            if (!content) {
+                alert(lang === "ja" ? "データがありません" : "No data");
+                return;
+            }
+
+            navigator.clipboard.writeText(content)
+                .then(() => alert(lang === "ja" ? "全データをコピーしました！" : "Copied all data!"))
+                .catch(err => alert("Failed to copy: " + err));
+        }
+
+        function addTextToPlaylist(file, content) {
+            let newAnnotations = [];
+            let lines = content.split(/\r?\n/);
+            let headerName = "";
+
+            // Check header Logic from User
+            const firstLine = lines[0]?.trim();
+            const isTimestamp = /^\d{2}:\d{2}:\d{2}/.test(firstLine);
+
+            if (firstLine && !isTimestamp) {
+                if (firstLine.toLowerCase() === "start") {
+                    lines = lines.slice(1);
+                    // Skip start, use filename
+                } else {
+                    headerName = firstLine;
+                    lines = lines.slice(1);
+                }
+            }
+
+            const filenameWithoutExt = file.name.replace(/\.txt$/i, "");
+
+            // Parse
+            newAnnotations = lines.filter(l => l.trim()).map(line => {
+                const parts = line.split(" ");
+                const timestamp = parts[0];
+                const note = parts.slice(1).join(" ");
+                return { timestamp, note };
+            }).filter(a => a.timestamp && /^\d{2}:\d{2}:\d{2}/.test(a.timestamp));
+
+            if (newAnnotations.length === 0) return;
+            let matchIndex = -1;
+
+            // Try Header Match
+            if (headerName) {
+                matchIndex = playlist.findIndex(p => p.name.replace(/\.[^/.]+$/, "") === headerName);
+            }
+
+            // Try Filename Match
+            if (matchIndex === -1) {
+                matchIndex = playlist.findIndex(p => p.name.replace(/\.[^/.]+$/, "") === filenameWithoutExt);
+            }
+
+            if (matchIndex === -1 && currentPlaylistIndex !== -1) {
+                // Fallback: Apply to CURRENT video
+                matchIndex = currentPlaylistIndex;
+            }
+
+            if (matchIndex !== -1) {
+                // Found Match or Fallback
+                playlist[matchIndex].annotations = newAnnotations;
+
+                if (matchIndex === currentPlaylistIndex) {
+                    annotations = [...playlist[matchIndex].annotations];
+                    // titleElement.textContent = ... (Keep Title!)
+                    updateAnnotationTable();
+                }
+                renderPlaylist();
+                saveToLocal();
+            } else {
+                // No match, and no current video? -> Add to Pending
+                // Store under both Header and Filename to ensure future match
+                if (headerName) pendingAnnotations[headerName] = newAnnotations;
+                pendingAnnotations[filenameWithoutExt] = newAnnotations;
+
+                alert(lang === "ja" ?
+                    "対応する動画が見つかりませんでした。動画を読み込むと自動適用されます。" :
+                    "No matching video found. Annotations pending load.");
+            }
+        }
+
+        function switchVideo(index) {
+            if (index < 0 || index >= playlist.length) return;
+            saveCurrentStateToPlaylist();
+
+            // Hide placeholder and show video
+            placeholder.style.display = "none";
+            video.style.display = "block";
+
+            currentPlaylistIndex = index;
+            const item = playlist[index];
+
+            if (item.videoFile) {
+                video.src = item.url;
+                currentVideoName = item.name.replace(/\.[^/.]+$/, "");
+            } else {
+                video.src = ""; // Clear video if no video file
+                currentVideoName = item.name; // Use full name for text-only
+            }
+
+            titleElement.textContent = currentVideoName;
+            annotations = [...item.annotations];
+            updateAnnotationTable();
+            renderPlaylist();
+
+            saveToLocal();
+        }
+
+        function toggleTheme() {
+            const currentTheme = document.documentElement.getAttribute("data-theme");
+            const newTheme = currentTheme === "dark" ? "light" : "dark";
+            document.documentElement.setAttribute("data-theme", newTheme);
+            localStorage.setItem("theme", newTheme);
+            document.getElementById("btn-theme-toggle").textContent = newTheme === "dark" ? "☀️" : "🌙";
+        }
+
+        function removeFromPlaylist(index) {
+            const wasPlaying = (index === currentPlaylistIndex);
+
+            playlist.splice(index, 1);
+            renderPlaylist();
+
+            if (wasPlaying) {
+                if (playlist.length > 0) {
+                    const nextIndex = Math.min(index, playlist.length - 1);
+                    switchVideo(nextIndex);
+                } else {
+                    video.src = "";
+                    placeholder.style.display = "flex";
+                    video.style.display = "none";
+                    currentVideoName = "";
+                    titleElement.textContent = t.title;
+                    annotations = [];
+                    updateAnnotationTable();
+                    currentPlaylistIndex = -1;
+                    saveToLocal();
+                }
+            } else if (index < currentPlaylistIndex) {
+                currentPlaylistIndex--;
+            }
+            saveToLocal();
+        }
+
+        function clearPlaylist() {
+            if (!confirm("Clear playlist?")) return;
+            playlist = [];
+            currentPlaylistIndex = -1;
+            video.src = "";
+
+            // Show placeholder
+            placeholder.style.display = "flex";
+            video.style.display = "none";
+
+            currentVideoName = "";
+            titleElement.textContent = t.title;
+            annotations = [];
+            updateAnnotationTable();
+            renderPlaylist();
+            saveToLocal();
+        }
+
+        function saveToLocal() {
+            localStorage.setItem("annotations", JSON.stringify(annotations));
+            if (currentVideoName) localStorage.setItem("currentVideoName", currentVideoName);
+        }
+
+        function updateAnnotationTable() {
+            annotationBody.innerHTML = "";
+            annotations.forEach((a, i) => {
+                const tr = document.createElement("tr");
+                tr.classList.add("annotation-row");
+                tr.innerHTML = `
+                <td>${i + 1}</td>
+                <td><button onclick='seekTo("${a.timestamp}")'>▶</button></td>
+                <td contenteditable='true' onblur='editTimestamp(${i}, this.innerText)'>${a.timestamp}</td>
+                <td contenteditable='true' onblur='editNote(${i}, this.innerText)'>${a.note}</td>
+                <td>
+                    <button class="btn-move" onclick="moveUp(${i})">↑</button>
+                    <button class="btn-move" onclick="moveDown(${i})">↓</button>
+                </td>
+                <td><button onclick='deleteAnnotation(${i})'>🗑️</button></td>`;
+                annotationBody.appendChild(tr);
+            });
+        }
+
+        function moveUp(index) {
+            if (index > 0) {
+                [annotations[index - 1], annotations[index]] = [annotations[index], annotations[index - 1]];
+                updateAnnotationTable();
+                saveToLocal();
+            }
+        }
+
+        function moveDown(index) {
+            if (index < annotations.length - 1) {
+                [annotations[index + 1], annotations[index]] = [annotations[index], annotations[index + 1]];
+                updateAnnotationTable();
+                saveToLocal();
+            }
+        }
+
+        function seekTo(timestamp) {
+            const [h, m, s] = timestamp.split(":").map(Number);
+            video.currentTime = h * 3600 + m * 60 + s;
+            video.play();
+        }
+
+        function addAnnotation() {
+            const t = new Date(video.currentTime * 1000).toISOString().substr(11, 8);
+            annotations.push({ timestamp: t, note: "" });
+            updateAnnotationTable();
+            saveToLocal();
+            saveCurrentStateToPlaylist(); // Sync to playlist
+            renderPlaylist(); // Update badge
+        }
+
+        function deleteAnnotation(index) {
+            annotations.splice(index, 1);
+            updateAnnotationTable();
+            saveToLocal();
+            saveCurrentStateToPlaylist(); // Sync to playlist
+            renderPlaylist(); // Update badge
+        }
+
+        function editTimestamp(index, value) {
+            annotations[index].timestamp = value.trim();
+            updateAnnotationTable();
+            saveToLocal();
+        }
+
+        function editNote(index, value) {
+            annotations[index].note = value.trim();
+            saveToLocal();
+        }
+
+        function saveAnnotations() {
+            let content = "";
+            if (currentVideoName) {
+                content += `${currentVideoName}\n`;
+            }
+            content += annotations.map(a => `${a.timestamp} ${a.note}`).join("\n");
+            const blob = new Blob([content], { type: "text/plain" });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement("a");
+            a.href = url;
+            a.download = currentVideoName ? `${currentVideoName}.txt` : "annotations.txt";
+            a.click();
+            URL.revokeObjectURL(url);
+        }
+
+        function copyAnnotations() {
+            let content = "";
+            if (currentVideoName) {
+                content += `${currentVideoName}\n`;
+            }
+            content += annotations.map(a => `${a.timestamp} ${a.note}`).join("\n");
+            navigator.clipboard.writeText(content)
+                .then(() => alert(lang === "ja" ? "クリップボードにコピーしました！" : "Copied to clipboard!"))
+                .catch(err => alert("Failed to copy: " + err));
+        }
+
+        function sortAnnotations() {
+            annotations.sort((a, b) => {
+                const toSeconds = (t) => {
+                    const [h, m, s] = t.split(":").map(Number);
+                    return h * 3600 + m * 60 + s;
+                };
+                return toSeconds(a.timestamp) - toSeconds(b.timestamp);
+            });
+            updateAnnotationTable();
+            saveToLocal();
+        }
+
+        function clearAnnotations() {
+            if (!confirm(lang === "ja" ? "本当にすべて削除しますか？" : "Are you sure you want to delete all annotations?")) return;
+            annotations = [];
+            // Preserve currentVideoName
+            updateAnnotationTable();
+            localStorage.removeItem("annotations");
+
+            saveCurrentStateToPlaylist(); // Sync to playlist
+            renderPlaylist(); // Update badge
+        }
+
+        function updateAudioTrackControls() {
+            try {
+                const tracks = video.audioTracks;
+                if (!tracks || tracks.length === 0) return;
+                trackContainer.innerHTML = "<b>Audio Tracks:</b><br>";
+
+                // Auto-select the last track by default
+                for (let i = 0; i < tracks.length; i++) {
+                    tracks[i].enabled = (i === tracks.length - 1);
+                }
+
+                for (let i = 0; i < tracks.length; i++) {
+                    const checkbox = document.createElement("input");
+                    checkbox.type = "radio";
+                    checkbox.name = "audioTrack";
+                    checkbox.value = i;
+                    checkbox.checked = tracks[i].enabled;
+                    checkbox.onchange = () => {
+                        for (let j = 0; j < tracks.length; j++) {
+                            tracks[j].enabled = (j === i);
+                        }
+                    };
+                    const label = document.createElement("label");
+                    label.textContent = ` Track ${i + 1} `;
+                    trackContainer.appendChild(checkbox);
+                    trackContainer.appendChild(label);
+                }
+            } catch (err) {
+                trackContainer.innerHTML = "<i>Audio track control not supported in this browser.</i>";
+            }
+        }
+
+        setInterval(() => {
+            try {
+                const tracks = video.audioTracks;
+                if (!tracks) return;
+                if (tracks.length !== prevTrackCount) {
+                    prevTrackCount = tracks.length;
+                    updateAudioTrackControls();
+                }
+            } catch (e) { }
+        }, 500);
+
+        videoFileInput.addEventListener("change", (e) => {
+            const file = e.target.files[0];
+            if (file) {
+                addVideoToPlaylist(file, true);
+            }
+        });
+
+        annotationFileInput.addEventListener("change", (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = (evt) => {
+                // Use the new reusable logic
+                addTextToPlaylist(file, evt.target.result);
+            };
+            reader.readAsText(file);
+        });
+
+        document.addEventListener("dragover", e => e.preventDefault());
+        document.addEventListener("drop", e => {
+            e.preventDefault();
+            const files = Array.from(e.dataTransfer.files);
+            if (files.length === 0) return;
+
+            const videos = files.filter(f => f.type.startsWith("video/"));
+            const texts = files.filter(f => f.name.endsWith(".txt"));
+
+            videos.forEach((file, i) => {
+                addVideoToPlaylist(file, i === videos.length - 1);
+            });
+
+            // Process Texts
+            texts.forEach(file => {
+                const reader = new FileReader();
+                reader.onload = (evt) => {
+                    addTextToPlaylist(file, evt.target.result);
+                };
+                reader.readAsText(file);
+            });
+        });
+
+        video.addEventListener("ended", () => {
+            video.currentTime = 0;
+        });
+
+        window.addEventListener("load", () => {
+            const saved = localStorage.getItem("annotations");
+            const savedName = localStorage.getItem("currentVideoName");
+            if (savedName) {
+                currentVideoName = savedName;
+                titleElement.textContent = currentVideoName;
+            }
+            if (saved) {
+                try {
+                    annotations = JSON.parse(saved);
+                    updateAnnotationTable();
+                } catch (e) {
+                    console.warn("Failed to parse saved annotations.");
+                }
+            }
+
+            // Restore speed
+            const savedSpeed = localStorage.getItem("playbackSpeed");
+            if (savedSpeed) {
+                const val = parseFloat(savedSpeed);
+                video.playbackRate = val;
+                speedRange.value = val;
+                speedValue.textContent = val.toFixed(1) + "x";
+            }
+
+            // Restore theme
+            const savedTheme = localStorage.getItem("theme");
+            if (savedTheme) {
+                document.documentElement.setAttribute("data-theme", savedTheme);
+                document.getElementById("btn-theme-toggle").textContent = savedTheme === "dark" ? "☀️" : "🌙";
+            }
+
+            // Restore layout
+            const savedLayoutWidth = localStorage.getItem("layoutRightWidth");
+            if (savedLayoutWidth) {
+                const videoSection = document.getElementById("video-section");
+                const annotationsSection = document.getElementById("annotations");
+                videoSection.style.flex = "1";
+                annotationsSection.style.flex = `0 0 ${savedLayoutWidth}px`;
+            }
+        });
+
+        // Resizer logic
+        const resizer = document.getElementById("resizer");
+        const videoSection = document.getElementById("video-section");
+        const annotationsSection = document.getElementById("annotations");
+        let isResizing = false;
+
+        resizer.addEventListener("mousedown", (e) => {
+            isResizing = true;
+            document.body.style.cursor = "col-resize";
+            document.body.style.userSelect = "none";
+        });
+
+        document.addEventListener("mousemove", (e) => {
+            if (!isResizing) return;
+            const containerWidth = document.getElementById("container").offsetWidth;
+            const newAnnotationWidth = containerWidth - e.clientX;
+
+            // Limit reasonable bounds
+            if (e.clientX > 200 && newAnnotationWidth > 200) {
+                videoSection.style.flex = "1";
+                annotationsSection.style.flex = `0 0 ${newAnnotationWidth}px`;
+            }
+        });
+
+        document.addEventListener("mouseup", () => {
+            if (isResizing) {
+                isResizing = false;
+                document.body.style.cursor = "default";
+                document.body.style.userSelect = "auto";
+
+                // Save layout width
+                const annotationsSection = document.getElementById("annotations");
+                localStorage.setItem("layoutRightWidth", annotationsSection.offsetWidth);
+            }
+        });
+
+        // Table Column Resizing
+        function initTableResizers() {
+            const ths = document.querySelectorAll("#annotation-table th");
+            ths.forEach(th => {
+                if (th.querySelector('.col-resizer')) return;
+
+                const resizer = document.createElement('div');
+                resizer.classList.add('col-resizer');
+                th.appendChild(resizer);
+
+                let startX, startWidth;
+
+                resizer.addEventListener('mousedown', (e) => {
+                    startX = e.pageX;
+                    startWidth = th.offsetWidth;
+                    document.addEventListener('mousemove', onMouseMove);
+                    document.addEventListener('mouseup', onMouseUp);
+                    e.stopPropagation();
+                    e.preventDefault();
+                });
+
+                function onMouseMove(e) {
+                    const diff = e.pageX - startX;
+                    th.style.width = (startWidth + diff) + 'px';
+                }
+
+                function onMouseUp() {
+                    document.removeEventListener('mousemove', onMouseMove);
+                    document.removeEventListener('mouseup', onMouseUp);
+                }
+            });
+        }
+
+        // Initialize Resizers (must be called after DOM update)
+        initTableResizers();
+    </script>
+</body>
+
+</html>
