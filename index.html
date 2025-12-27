@@ -99,6 +99,7 @@
 
         #th-index,
         #th-play,
+        #th-priority,
         #th-time,
         #th-move,
         #th-delete {
@@ -282,6 +283,58 @@
             color: var(--text-main);
             border-top: 1px solid var(--border-color);
         }
+
+        /* Modal Styles */
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 100;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            overflow: auto;
+            background-color: rgba(0, 0, 0, 0.4);
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal-content {
+            background-color: var(--bg-panel);
+            margin: auto;
+            padding: 20px;
+            border: 1px solid var(--border-color);
+            width: 80%;
+            max-width: 500px;
+            border-radius: 8px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+        }
+
+        .modal-header h3 {
+            margin-top: 0;
+        }
+
+        .settings-row {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 8px;
+        }
+
+        .settings-row input {
+            padding: 5px;
+            border: 1px solid var(--border-color);
+            background: var(--bg-container);
+            color: var(--text-main);
+        }
+
+        .settings-row input.symbol-input {
+            width: 60px;
+            text-align: center;
+        }
+
+        .settings-row input.desc-input {
+            flex: 1;
+        }
     </style>
 </head>
 
@@ -346,8 +399,12 @@
                 <div
                     style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 5px;">
                     <h3 id="annotation-title" style="margin: 0;">Annotations</h3>
-                    <button id="btn-theme-toggle" onclick="toggleTheme()"
-                        style="background: none; border: 1px solid var(--border-color); color: var(--text-main); font-size: 14px; padding: 2px 8px; margin: 0;">🌙</button>
+                    <div style="display:flex;">
+                        <button id="btn-settings" onclick="configurePriorities()"
+                            style="background: none; border: 1px solid var(--border-color); color: var(--text-main); font-size: 14px; padding: 2px 8px; margin: 0 4px;">⚙️</button>
+                        <button id="btn-theme-toggle" onclick="toggleTheme()"
+                            style="background: none; border: 1px solid var(--border-color); color: var(--text-main); font-size: 14px; padding: 2px 8px; margin: 0;">🌙</button>
+                    </div>
                 </div>
                 <button onclick="addAnnotation()" id="btn-add">Add</button>
                 <button onclick="saveAnnotations()" id="btn-save">Save txt</button>
@@ -361,6 +418,7 @@
                         <tr>
                             <th id="th-index">#</th>
                             <th id="th-play">Play</th>
+                            <th id="th-priority">P</th>
                             <th id="th-time">Timestamp</th>
                             <th id="th-note">Note</th>
                             <th id="th-move">Move</th>
@@ -392,7 +450,9 @@
                 note: "アノテーション",
                 delete: "削除",
                 index: "#",
+                index: "#",
                 move: "移動",
+                priority: "優先",
                 speed: "再生速度: ",
                 reset: "リセット",
                 playlistLabel: "素材",
@@ -400,7 +460,16 @@
                 saveAll: "全テキスト保存",
                 copyAll: "全コピー",
                 placeholder: "動画をここにドロップ、または読み込んでください",
-                loadBtn: "動画を読み込む"
+                loadBtn: "動画を読み込む",
+                settingsTitle: "優先度設定",
+                settingsDesc: "優先度記号と意味を定義します。",
+                settingsAdd: "+ 行を追加",
+                settingsCancel: "キャンセル",
+                settingsSave: "保存",
+                settingsSym: "記号",
+                settingsDescPlaceholder: "意味",
+                legend: "【優先度】",
+                timestamps: "【タイムスタンプ】"
             },
             en: {
                 video: "Load Video:",
@@ -416,7 +485,10 @@
                 note: "Note",
                 delete: "Delete",
                 index: "#",
+                delete: "Delete",
+                index: "#",
                 move: "Move",
+                priority: "Prio",
                 speed: "Playback Speed: ",
                 reset: "Reset",
                 playlistLabel: "Material",
@@ -424,7 +496,16 @@
                 saveAll: "Save All",
                 copyAll: "Copy All",
                 placeholder: "Drop video here or load via button",
-                loadBtn: "Load Video"
+                loadBtn: "Load Video",
+                settingsTitle: "Priority Settings",
+                settingsDesc: "Define priority symbols and their meanings.",
+                settingsAdd: "+ Add Row",
+                settingsCancel: "Cancel",
+                settingsSave: "Save",
+                settingsSym: "Sym",
+                settingsDescPlaceholder: "Description",
+                legend: "【Legend】",
+                timestamps: "【Timestamps】"
             }
         };
 
@@ -438,6 +519,7 @@
         document.getElementById("btn-sort").textContent = t.sort;
         document.getElementById("btn-clear").textContent = t.clear;
         document.getElementById("th-play").textContent = t.play;
+        document.getElementById("th-priority").textContent = t.priority;
         document.getElementById("th-time").textContent = t.timestamp;
         document.getElementById("th-note").textContent = t.note;
         document.getElementById("th-delete").textContent = t.delete;
@@ -494,6 +576,8 @@
 
         const titleElement = document.getElementById("annotation-title");
 
+        let priorityList = ["", "◎", "★"];
+        let priorityDescriptions = { "◎": "重要場面", "★": "最重要場面" }; // Default descriptions
         let annotations = [];
         let prevTrackCount = -1;
         let currentVideoName = "";
@@ -509,6 +593,20 @@
 
         // Pending Annotations Queue: { "VideoName": [annotations...], ... }
         let pendingAnnotations = {};
+
+        function generateLegendContent() {
+            let legend = "";
+            const keys = Object.keys(priorityDescriptions);
+            if (keys.length > 0) {
+                legend += t.legend + "\n";
+                keys.forEach(k => {
+                    legend += `${k}: ${priorityDescriptions[k]}\n`;
+                });
+                legend += "\n";
+            }
+
+            return legend;
+        }
 
         function renderPlaylist() {
             const ul = document.getElementById("playlist-ul");
@@ -673,7 +771,13 @@
             playlist.forEach(item => {
                 if (item.annotations && item.annotations.length > 0) {
                     content += `--- ${item.name} ---\n`;
-                    content += item.annotations.map(a => `${a.timestamp} ${a.note}`).join("\n");
+                    content += generateLegendContent();
+                    content += t.timestamps + "\n";
+
+                    content += item.annotations.map(a => {
+                        const p = a.priority || "";
+                        return `${p}\t[${a.timestamp}] ${a.note}`;
+                    }).join("\n");
                     content += "\n\n";
                 }
             });
@@ -699,7 +803,13 @@
             playlist.forEach(item => {
                 if (item.annotations && item.annotations.length > 0) {
                     content += `--- ${item.name} ---\n`;
-                    content += item.annotations.map(a => `${a.timestamp} ${a.note}`).join("\n");
+                    content += generateLegendContent();
+                    content += t.timestamps + "\n";
+
+                    content += item.annotations.map(a => {
+                        const p = a.priority || "";
+                        return `${p}\t[${a.timestamp}] ${a.note}`;
+                    }).join("\n");
                     content += "\n\n";
                 }
             });
@@ -720,8 +830,9 @@
             let headerName = "";
 
             // Check header Logic from User
+            // Check header Logic from User
             const firstLine = lines[0]?.trim();
-            const isTimestamp = /^\d{2}:\d{2}:\d{2}/.test(firstLine);
+            const isTimestamp = /^\[?\d{2}:\d{2}:\d{2}\]?/.test(firstLine);
 
             if (firstLine && !isTimestamp) {
                 if (firstLine.toLowerCase() === "start") {
@@ -737,10 +848,25 @@
 
             // Parse
             newAnnotations = lines.filter(l => l.trim()).map(line => {
-                const parts = line.split(" ");
-                const timestamp = parts[0];
-                const note = parts.slice(1).join(" ");
-                return { timestamp, note };
+                const parts = line.trim().split(/\s+/);
+                // Remove optional brackets from timestamp
+                let timestamp = parts[0].replace(/^\[|\]$/g, "");
+                let priority = "";
+                let noteParts = parts.slice(1);
+
+                if (priorityList.includes(timestamp) && parts.length > 1) {
+                    priority = timestamp;
+                    timestamp = parts[1].replace(/^\[|\]$/g, "");
+                    noteParts = parts.slice(2);
+                } else if (!/^\d{2}:\d{2}:\d{2}/.test(timestamp) && parts.length > 1 && /^\[?\d{2}:\d{2}:\d{2}\]?/.test(parts[1])) {
+                    // Auto-detect unknown priority symbol if followed by timestamp
+                    priority = timestamp;
+                    timestamp = parts[1].replace(/^\[|\]$/g, "");
+                    noteParts = parts.slice(2);
+                }
+
+                const note = noteParts.join(" ");
+                return { timestamp, note, priority };
             }).filter(a => a.timestamp && /^\d{2}:\d{2}:\d{2}/.test(a.timestamp));
 
             if (newAnnotations.length === 0) return;
@@ -877,6 +1003,7 @@
                 tr.innerHTML = `
                 <td>${i + 1}</td>
                 <td><button onclick='seekTo("${a.timestamp}")'>▶</button></td>
+                <td style="cursor:pointer; user-select:none; text-align:center;" onclick="togglePriority(${i})">${a.priority || ""}</td>
                 <td contenteditable='true' onblur='editTimestamp(${i}, this.innerText)'>${a.timestamp}</td>
                 <td contenteditable='true' onblur='editNote(${i}, this.innerText)'>${a.note}</td>
                 <td>
@@ -904,6 +1031,80 @@
             }
         }
 
+        function togglePriority(index) {
+            let current = annotations[index].priority || "";
+            let nextIdx = (priorityList.indexOf(current) + 1) % priorityList.length;
+            // Handle case where config changed and current is not in list
+            if (priorityList.indexOf(current) === -1) nextIdx = 1;
+
+            annotations[index].priority = priorityList[nextIdx];
+            updateAnnotationTable();
+            saveToLocal();
+            saveCurrentStateToPlaylist();
+        }
+
+        function configurePriorities() {
+            const modal = document.getElementById("settings-modal");
+            const list = document.getElementById("settings-list");
+            list.innerHTML = "";
+
+            // Skip the first empty priority
+            priorityList.slice(1).forEach(p => {
+                addSettingsRow(p, priorityDescriptions[p] || "");
+            });
+
+            // Localize Modal static text
+            document.getElementById("modal-title").innerText = t.settingsTitle;
+            document.getElementById("modal-desc").innerText = t.settingsDesc;
+            document.getElementById("btn-settings-add").innerText = t.settingsAdd;
+            document.getElementById("btn-settings-save").textContent = t.settingsSave;
+            document.getElementById("btn-settings-cancel").textContent = t.settingsCancel;
+
+            modal.style.display = "flex";
+        }
+
+        function addSettingsRow(symbol = "", desc = "") {
+            const list = document.getElementById("settings-list");
+            const div = document.createElement("div");
+            div.className = "settings-row";
+            div.innerHTML = `
+                <input type="text" class="symbol-input" placeholder="${t.settingsSym}" value="${symbol}">
+                <input type="text" class="desc-input" placeholder="${t.settingsDescPlaceholder}" value="${desc}">
+                <button onclick="this.parentElement.remove()" style="background:#ff4d4d; color:white; padding:2px 8px;">×</button>
+            `;
+            list.appendChild(div);
+        }
+
+        function closeSettingsModal() {
+            document.getElementById("settings-modal").style.display = "none";
+        }
+
+        function saveSettingsModal() {
+            const newPriorityList = [""];
+            const newDescriptions = {};
+            const rows = document.querySelectorAll("#settings-list .settings-row");
+
+            rows.forEach(row => {
+                const sym = row.querySelector(".symbol-input").value.trim();
+                const desc = row.querySelector(".desc-input").value.trim();
+                if (sym) {
+                    newPriorityList.push(sym);
+                    if (desc) {
+                        newDescriptions[sym] = desc;
+                    }
+                }
+            });
+
+            priorityList = newPriorityList;
+            priorityDescriptions = newDescriptions;
+
+            localStorage.setItem("prioritySettings", JSON.stringify(priorityList.slice(1)));
+            localStorage.setItem("priorityDescriptions", JSON.stringify(priorityDescriptions));
+
+            alert(lang === "ja" ? "設定を保存しました。" : "Settings saved.");
+            closeSettingsModal();
+        }
+
         function seekTo(timestamp) {
             const [h, m, s] = timestamp.split(":").map(Number);
             video.currentTime = h * 3600 + m * 60 + s;
@@ -912,7 +1113,7 @@
 
         function addAnnotation() {
             const t = new Date(video.currentTime * 1000).toISOString().substr(11, 8);
-            annotations.push({ timestamp: t, note: "" });
+            annotations.push({ timestamp: t, note: "", priority: "" });
             updateAnnotationTable();
             saveToLocal();
             saveCurrentStateToPlaylist(); // Sync to playlist
@@ -943,7 +1144,14 @@
             if (currentVideoName) {
                 content += `${currentVideoName}\n`;
             }
-            content += annotations.map(a => `${a.timestamp} ${a.note}`).join("\n");
+            content += generateLegendContent();
+            content += t.timestamps + "\n";
+
+            content += annotations.map(a => {
+                const p = a.priority || "";
+                return `${p}\t[${a.timestamp}] ${a.note}`;
+            }).join("\n");
+
             const blob = new Blob([content], { type: "text/plain" });
             const url = URL.createObjectURL(blob);
             const a = document.createElement("a");
@@ -958,7 +1166,14 @@
             if (currentVideoName) {
                 content += `${currentVideoName}\n`;
             }
-            content += annotations.map(a => `${a.timestamp} ${a.note}`).join("\n");
+            content += generateLegendContent();
+            content += t.timestamps + "\n";
+
+            content += annotations.map(a => {
+                const p = a.priority || "";
+                return `${p}\t[${a.timestamp}] ${a.note}`;
+            }).join("\n");
+
             navigator.clipboard.writeText(content)
                 .then(() => alert(lang === "ja" ? "クリップボードにコピーしました！" : "Copied to clipboard!"))
                 .catch(err => alert("Failed to copy: " + err));
@@ -1115,6 +1330,27 @@
                 videoSection.style.flex = "1";
                 annotationsSection.style.flex = `0 0 ${savedLayoutWidth}px`;
             }
+
+            // Restore Priority Settings
+            const savedPriorities = localStorage.getItem("prioritySettings");
+            const savedDesc = localStorage.getItem("priorityDescriptions");
+
+            if (savedPriorities) {
+                try {
+                    const parts = JSON.parse(savedPriorities);
+                    if (Array.isArray(parts)) {
+                        priorityList = ["", ...parts];
+                    }
+                } catch (e) {
+                    console.warn("Failed to load priority settings");
+                }
+            }
+
+            if (savedDesc) {
+                try {
+                    priorityDescriptions = JSON.parse(savedDesc);
+                } catch (e) { }
+            }
         });
 
         // Resizer logic
@@ -1189,6 +1425,27 @@
         // Initialize Resizers (must be called after DOM update)
         initTableResizers();
     </script>
+    </script>
+
+    <!-- Settings Modal -->
+    <div id="settings-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 id="modal-title">Priority Settings</h3>
+            </div>
+            <div id="modal-body">
+                <p id="modal-desc" style="font-size: 0.9em; color: var(--text-muted);">Define priority symbols and their
+                    meanings.</p>
+                <div id="settings-list"></div>
+                <button id="btn-settings-add" onclick="addSettingsRow()">+ Add Row</button>
+            </div>
+            <div style="margin-top: 20px; text-align: right;">
+                <button id="btn-settings-cancel" onclick="closeSettingsModal()"
+                    style="background-color: var(--border-color); color: var(--text-main);">Cancel</button>
+                <button id="btn-settings-save" onclick="saveSettingsModal()">Save</button>
+            </div>
+        </div>
+    </div>
 </body>
 
 </html>
