@@ -768,10 +768,10 @@
             saveCurrentStateToPlaylist(); // ensure current is up to date
 
             let content = "";
+            content += generateLegendContent();
             playlist.forEach(item => {
                 if (item.annotations && item.annotations.length > 0) {
                     content += `--- ${item.name} ---\n`;
-                    content += generateLegendContent();
                     content += t.timestamps + "\n";
 
                     content += item.annotations.map(a => {
@@ -800,10 +800,10 @@
             saveCurrentStateToPlaylist();
 
             let content = "";
+            content += generateLegendContent();
             playlist.forEach(item => {
                 if (item.annotations && item.annotations.length > 0) {
                     content += `--- ${item.name} ---\n`;
-                    content += generateLegendContent();
                     content += t.timestamps + "\n";
 
                     content += item.annotations.map(a => {
