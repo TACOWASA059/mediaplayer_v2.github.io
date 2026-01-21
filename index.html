@@ -418,8 +418,8 @@
                         <tr>
                             <th id="th-index">#</th>
                             <th id="th-play">Play</th>
-                            <th id="th-priority">P</th>
                             <th id="th-time">Timestamp</th>
+                            <th id="th-priority">P</th>
                             <th id="th-note">Note</th>
                             <th id="th-move">Move</th>
                             <th id="th-delete">Delete</th>
@@ -469,7 +469,8 @@
                 settingsSym: "記号",
                 settingsDescPlaceholder: "意味",
                 legend: "【優先度】",
-                timestamps: "【タイムスタンプ】"
+                timestamps: "【タイムスタンプ】",
+                settingsIncludeLegend: "出力に優先度の説明を含める"
             },
             en: {
                 video: "Load Video:",
@@ -505,7 +506,8 @@
                 settingsSym: "Sym",
                 settingsDescPlaceholder: "Description",
                 legend: "【Legend】",
-                timestamps: "【Timestamps】"
+                timestamps: "【Timestamps】",
+                settingsIncludeLegend: "Include legend in output"
             }
         };
 
@@ -578,6 +580,7 @@
 
         let priorityList = ["", "◎", "★"];
         let priorityDescriptions = { "◎": "重要場面", "★": "最重要場面" }; // Default descriptions
+        let includeLegendInOutput = false; // Default: false
         let annotations = [];
         let prevTrackCount = -1;
         let currentVideoName = "";
@@ -595,6 +598,8 @@
         let pendingAnnotations = {};
 
         function generateLegendContent() {
+            if (!includeLegendInOutput) return "";
+
             let legend = "";
             const keys = Object.keys(priorityDescriptions);
             if (keys.length > 0) {
@@ -603,6 +608,7 @@
                     legend += `${k}: ${priorityDescriptions[k]}\n`;
                 });
                 legend += "\n";
+                legend += t.timestamps + "\n";
             }
 
             return legend;
@@ -772,11 +778,10 @@
             playlist.forEach(item => {
                 if (item.annotations && item.annotations.length > 0) {
                     content += `--- ${item.name} ---\n`;
-                    content += t.timestamps + "\n";
 
                     content += item.annotations.map(a => {
                         const p = a.priority || "";
-                        return `${p}\t[${a.timestamp}] ${a.note}`;
+                        return `[${a.timestamp}] ${p}${a.note}`;
                     }).join("\n");
                     content += "\n\n";
                 }
@@ -804,11 +809,10 @@
             playlist.forEach(item => {
                 if (item.annotations && item.annotations.length > 0) {
                     content += `--- ${item.name} ---\n`;
-                    content += t.timestamps + "\n";
 
                     content += item.annotations.map(a => {
                         const p = a.priority || "";
-                        return `${p}\t[${a.timestamp}] ${a.note}`;
+                        return `[${a.timestamp}] ${p}${a.note}`;
                     }).join("\n");
                     content += "\n\n";
                 }
@@ -1003,8 +1007,8 @@
                 tr.innerHTML = `
                 <td>${i + 1}</td>
                 <td><button onclick='seekTo("${a.timestamp}")'>▶</button></td>
-                <td style="cursor:pointer; user-select:none; text-align:center;" onclick="togglePriority(${i})">${a.priority || ""}</td>
                 <td contenteditable='true' onblur='editTimestamp(${i}, this.innerText)'>${a.timestamp}</td>
+                <td style="cursor:pointer; user-select:none; text-align:center;" onclick="togglePriority(${i})">${a.priority || ""}</td>
                 <td contenteditable='true' onblur='editNote(${i}, this.innerText)'>${a.note}</td>
                 <td>
                     <button class="btn-move" onclick="moveUp(${i})">↑</button>
@@ -1053,12 +1057,16 @@
                 addSettingsRow(p, priorityDescriptions[p] || "");
             });
 
+            // Set checkbox state
+            document.getElementById("include-legend-checkbox").checked = includeLegendInOutput;
+
             // Localize Modal static text
             document.getElementById("modal-title").innerText = t.settingsTitle;
             document.getElementById("modal-desc").innerText = t.settingsDesc;
             document.getElementById("btn-settings-add").innerText = t.settingsAdd;
             document.getElementById("btn-settings-save").textContent = t.settingsSave;
             document.getElementById("btn-settings-cancel").textContent = t.settingsCancel;
+            document.getElementById("include-legend-label").textContent = t.settingsIncludeLegend;
 
             modal.style.display = "flex";
         }
@@ -1098,8 +1106,12 @@
             priorityList = newPriorityList;
             priorityDescriptions = newDescriptions;
 
+            // Save include legend setting
+            includeLegendInOutput = document.getElementById("include-legend-checkbox").checked;
+
             localStorage.setItem("prioritySettings", JSON.stringify(priorityList.slice(1)));
             localStorage.setItem("priorityDescriptions", JSON.stringify(priorityDescriptions));
+            localStorage.setItem("includeLegendInOutput", JSON.stringify(includeLegendInOutput));
 
             alert(lang === "ja" ? "設定を保存しました。" : "Settings saved.");
             closeSettingsModal();
@@ -1145,11 +1157,10 @@
                 content += `${currentVideoName}\n`;
             }
             content += generateLegendContent();
-            content += t.timestamps + "\n";
 
             content += annotations.map(a => {
                 const p = a.priority || "";
-                return `${p}\t[${a.timestamp}] ${a.note}`;
+                return `[${a.timestamp}] ${p}${a.note}`;
             }).join("\n");
 
             const blob = new Blob([content], { type: "text/plain" });
@@ -1167,11 +1178,10 @@
                 content += `${currentVideoName}\n`;
             }
             content += generateLegendContent();
-            content += t.timestamps + "\n";
 
             content += annotations.map(a => {
                 const p = a.priority || "";
-                return `${p}\t[${a.timestamp}] ${a.note}`;
+                return `[${a.timestamp}] ${p}${a.note}`;
             }).join("\n");
 
             navigator.clipboard.writeText(content)
@@ -1334,6 +1344,7 @@
             // Restore Priority Settings
             const savedPriorities = localStorage.getItem("prioritySettings");
             const savedDesc = localStorage.getItem("priorityDescriptions");
+            const savedIncludeLegend = localStorage.getItem("includeLegendInOutput");
 
             if (savedPriorities) {
                 try {
@@ -1349,6 +1360,12 @@
             if (savedDesc) {
                 try {
                     priorityDescriptions = JSON.parse(savedDesc);
+                } catch (e) { }
+            }
+
+            if (savedIncludeLegend) {
+                try {
+                    includeLegendInOutput = JSON.parse(savedIncludeLegend);
                 } catch (e) { }
             }
         });
@@ -1438,6 +1455,12 @@
                     meanings.</p>
                 <div id="settings-list"></div>
                 <button id="btn-settings-add" onclick="addSettingsRow()">+ Add Row</button>
+                <div style="margin-top: 15px; padding-top: 15px; border-top: 1px solid var(--border-color);">
+                    <label style="display: flex; align-items: center; cursor: pointer;">
+                        <input type="checkbox" id="include-legend-checkbox" style="margin-right: 8px;">
+                        <span id="include-legend-label">Include legend in output</span>
+                    </label>
+                </div>
             </div>
             <div style="margin-top: 20px; text-align: right;">
                 <button id="btn-settings-cancel" onclick="closeSettingsModal()"
