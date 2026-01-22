@@ -1218,11 +1218,6 @@
                 if (!tracks || tracks.length === 0) return;
                 trackContainer.innerHTML = "<b>Audio Tracks:</b><br>";
 
-                // Auto-select the last track by default
-                for (let i = 0; i < tracks.length; i++) {
-                    tracks[i].enabled = (i === tracks.length - 1);
-                }
-
                 for (let i = 0; i < tracks.length; i++) {
                     const checkbox = document.createElement("input");
                     checkbox.type = "radio";
